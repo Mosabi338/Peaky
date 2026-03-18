@@ -1,0 +1,29 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.Peaky.app
+productName: Peaky
+files:
+  - filter:
+      - dist/**/*
+      - dist-electron/**/*
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  signingHashAlgorithms: null
+  sign: null
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Peaky
+publish:
+  provider: github
+  owner: Mosabi338
+  repo: Peaky
+electronVersion: 33.4.11
