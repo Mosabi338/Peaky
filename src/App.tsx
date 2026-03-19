@@ -117,9 +117,41 @@ export default function App() {
   // ── Manual recording ────────────────────────────────
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Get microphone audio
+      const micStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
       })
+
+      // Try to also get system audio
+      let stream: MediaStream
+
+      try {
+        const sourceResult = await (window as any).ghostkey.getDesktopAudioSource()
+
+        if (sourceResult && sourceResult.sourceId) {
+          const systemStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceResult.sourceId,
+              },
+            } as any,
+          })
+
+          const audioContext = new AudioContext()
+          const micSource = audioContext.createMediaStreamSource(micStream)
+          const sysSource = audioContext.createMediaStreamSource(systemStream)
+          const destination = audioContext.createMediaStreamDestination()
+          micSource.connect(destination)
+          sysSource.connect(destination)
+          stream = destination.stream
+        } else {
+          stream = micStream
+        }
+      } catch (sysError) {
+        stream = micStream
+      }
+
       streamRef.current = stream
       useStore.getState().setRecording(true)
       recordChunk(stream)
@@ -145,14 +177,55 @@ export default function App() {
   // ── Interview session ───────────────────────────────
   const startInterviewSession = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Step 1: Get microphone audio (your voice)
+      const micStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
       })
-      streamRef.current = stream
 
-      const audioContext = new AudioContext()
+      // Step 2: Try to get system audio (interviewer's voice from Zoom/Meet/Teams)
+      let combinedStream: MediaStream
+
+      try {
+        const sourceResult = await (window as any).ghostkey.getDesktopAudioSource()
+
+        if (sourceResult && sourceResult.sourceId) {
+          const systemStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: sourceResult.sourceId,
+              },
+            } as any,
+          })
+
+          // Step 3: Combine microphone + system audio into one stream
+          const audioContext = new AudioContext()
+          const micSource = audioContext.createMediaStreamSource(micStream)
+          const sysSource = audioContext.createMediaStreamSource(systemStream)
+          const destination = audioContext.createMediaStreamDestination()
+
+          // Mix both audio sources together
+          micSource.connect(destination)
+          sysSource.connect(destination)
+
+          combinedStream = destination.stream
+          console.log('✅ Recording: Microphone + System Audio')
+        } else {
+          // System audio not available, use microphone only
+          combinedStream = micStream
+          console.log('⚠️ Recording: Microphone only (system audio not available)')
+        }
+      } catch (sysError) {
+        // System audio failed, fall back to microphone only
+        combinedStream = micStream
+        console.log('⚠️ Recording: Microphone only (system audio error)')
+      }
+
+      streamRef.current = combinedStream
+
+      const audioContext = audioContextRef.current || new AudioContext()
       audioContextRef.current = audioContext
-      const source = audioContext.createMediaStreamSource(stream)
+      const source = audioContext.createMediaStreamSource(combinedStream)
       const analyser = audioContext.createAnalyser()
       analyser.fftSize = 512
       analyser.smoothingTimeConstant = 0.85
@@ -167,7 +240,7 @@ export default function App() {
       state.setSpeechState('silent')
       state.setNewQuestionDetected(false)
 
-      recordChunk(stream)
+      recordChunk(combinedStream)
       startSilenceDetection()
     } catch (e: any) {
       useStore.getState().setAIError('Microphone access denied')

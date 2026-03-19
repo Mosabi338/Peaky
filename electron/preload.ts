@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('ghostkey', {
   },
 
   captureScreen: () => ipcRenderer.invoke('capture-screen'),
+  getDesktopAudioSource: () => ipcRenderer.invoke('get-desktop-audio-source'),
   copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
   loadSettings: () => ipcRenderer.invoke('load-settings'),
   saveSettings: (s: any) => ipcRenderer.invoke('save-settings', s),

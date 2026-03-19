@@ -1,8 +1,8 @@
 version: 2.0.0
 files:
   - url: Peaky-Setup-2.0.0.exe
-    sha512: 1n2dWwOFEQdEmnmwheTc6sh5+jg30hP3WBp3rxBMk4cfqi5JEVwmDGITp7H1Pte+7NyhdpIdFC7horaXt/mEGQ==
-    size: 85344301
+    sha512: bGlIend4LXWC03NCfLekUxiWME4B3AqtY/iQpiSIjaUm7ZLOEW64zG28hBNkuhMQPa4qHMHQa8rsdyYOxJ3Upw==
+    size: 85500249
 path: Peaky-Setup-2.0.0.exe
-sha512: 1n2dWwOFEQdEmnmwheTc6sh5+jg30hP3WBp3rxBMk4cfqi5JEVwmDGITp7H1Pte+7NyhdpIdFC7horaXt/mEGQ==
-releaseDate: '2026-03-17T14:16:40.821Z'
+sha512: bGlIend4LXWC03NCfLekUxiWME4B3AqtY/iQpiSIjaUm7ZLOEW64zG28hBNkuhMQPa4qHMHQa8rsdyYOxJ3Upw==
+releaseDate: '2026-03-19T05:56:06.528Z'
