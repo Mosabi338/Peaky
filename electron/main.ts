@@ -37,7 +37,7 @@ let openai: OpenAI | null = null
 let isVisible = true
 let isClickThrough = false
 
-const SETTINGS_DIR = join(app.getPath('userData'), 'Peaky')
+const SETTINGS_DIR = join(app.getPath('userData'), 'ghostkey')
 const SETTINGS_PATH = join(SETTINGS_DIR, 'settings.json')
 
 interface Settings {
@@ -465,21 +465,7 @@ ipcMain.on(
     }
   }
 )
-// ── IPC: Get system audio source ───────────────────────
-ipcMain.handle('get-desktop-audio-source', async () => {
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width: 1, height: 1 },
-    })
-    if (sources.length > 0) {
-      return { sourceId: sources[0].id }
-    }
-    return { error: 'No source found' }
-  } catch (e: any) {
-    return { error: e.message }
-  }
-})
+
 // ── IPC: Screen capture ────────────────────────────────
 ipcMain.handle('capture-screen', async () => {
   try {
