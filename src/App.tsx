@@ -115,19 +115,60 @@ export default function App() {
   }, [])
 
   // ── Manual recording ────────────────────────────────
-  const startRecording = useCallback(async () => {
+      // Try different audio settings until one works
+  const getWorkingMicStream = useCallback(async (): Promise<MediaStream> => {
+    // Attempt 1: Best quality (with echo cancellation + noise suppression)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: true, sampleRate: 16000 },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000,
+        },
       })
+      console.log('✅ Microphone: Using full audio processing')
+      return stream
+    } catch (e) {
+      console.log('⚠️ Full audio processing failed, trying simpler settings...')
+    }
+
+    // Attempt 2: Without echo cancellation
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: true,
+          sampleRate: 16000,
+        },
+      })
+      console.log('✅ Microphone: Using noise suppression only')
+      return stream
+    } catch (e) {
+      console.log('⚠️ Noise suppression only failed, trying basic...')
+    }
+
+    // Attempt 3: Most basic (works on almost every PC)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      })
+      console.log('✅ Microphone: Using basic audio (no processing)')
+      return stream
+    } catch (e) {
+      console.log('❌ All microphone attempts failed')
+      throw new Error('Microphone access denied or not available')
+    }
+  }, [])
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await getWorkingMicStream()
       streamRef.current = stream
       useStore.getState().setRecording(true)
       recordChunk(stream)
     } catch (e: any) {
       useStore.getState().setAIError('Microphone access denied')
     }
-  }, [recordChunk])
-
+  }, [recordChunk, getWorkingMicStream])
   const stopRecording = useCallback(() => {
     useStore.getState().setRecording(false)
     if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current)
@@ -143,11 +184,9 @@ export default function App() {
   }, [startRecording, stopRecording])
 
   // ── Interview session ───────────────────────────────
-  const startInterviewSession = useCallback(async () => {
+    const startInterviewSession = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, noiseSuppression: true, sampleRate: 16000 },
-      })
+      const stream = await getWorkingMicStream()
       streamRef.current = stream
 
       const audioContext = new AudioContext()
@@ -172,7 +211,7 @@ export default function App() {
     } catch (e: any) {
       useStore.getState().setAIError('Microphone access denied')
     }
-  }, [recordChunk])
+  }, [recordChunk, getWorkingMicStream])
 
   const stopInterviewSession = useCallback(() => {
     const state = useStore.getState()
