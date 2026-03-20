@@ -3,4 +3,4 @@ require("electron");
 require("path");
 require("fs");
 require("os");
-require("./main-BgSjgixk.js");
+require("./main-Ce-ZIyY1.js");

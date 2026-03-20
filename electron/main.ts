@@ -9,6 +9,7 @@ import {
   Menu,
   nativeImage,
   screen as electronScreen,
+  session,
 } from 'electron'
 import { join } from 'path'
 import {
@@ -36,6 +37,7 @@ let tray: Tray | null = null
 let openai: OpenAI | null = null
 let isVisible = true
 let isClickThrough = false
+let stealthEnforcerInterval: ReturnType<typeof setInterval> | null = null
 
 const SETTINGS_DIR = join(app.getPath('userData'), 'ghostkey')
 const SETTINGS_PATH = join(SETTINGS_DIR, 'settings.json')
@@ -209,6 +211,28 @@ If you can see the user's screen, analyze what's visible and help accordingly.${
   return prompts[mode] || prompts.general
 }
 
+// ── Stealth enforcement helper ─────────────────────────
+function enforceStealthProperties() {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  try {
+    // Re-apply content protection (prevents screen capture)
+    mainWindow.setContentProtection(true)
+
+    // Ensure no window title leaks
+    mainWindow.setTitle('')
+
+    // Keep skip taskbar active
+    mainWindow.setSkipTaskbar(true)
+
+    // Keep always on top at highest level
+    if (isVisible) {
+      mainWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+    }
+  } catch (e) {
+    // Window may be in a transitional state, ignore
+  }
+}
+
 // ── Window Creation ────────────────────────────────────
 function createWindow() {
   const settings = loadSettings()
@@ -236,6 +260,8 @@ function createWindow() {
     fullscreenable: false,
     type: 'toolbar',
     focusable: true,
+    // Prevent the window from appearing in screenshots/recordings from the start
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -244,18 +270,39 @@ function createWindow() {
     },
   })
 
-  // ★ STEALTH ★
+  // ★ STEALTH — Apply all protections immediately ★
   mainWindow.setContentProtection(true)
   mainWindow.setTitle('')
   mainWindow.setAlwaysOnTop(true, 'screen-saver', 1)
   mainWindow.setVisibleOnAllWorkspaces(true)
   mainWindow.setSkipTaskbar(true)
 
+  // ★ STEALTH — Re-enforce on every focus/show event ★
+  mainWindow.on('show', () => {
+    enforceStealthProperties()
+  })
+
+  mainWindow.on('focus', () => {
+    enforceStealthProperties()
+  })
+
+  mainWindow.on('restore', () => {
+    enforceStealthProperties()
+  })
+
+  // Prevent the window title from changing via page navigation
+  mainWindow.on('page-title-updated', (e) => {
+    e.preventDefault()
+    mainWindow?.setTitle('')
+  })
+
   mainWindow.on('moved', () => {
     if (mainWindow) {
       const s = loadSettings()
       s.windowBounds = mainWindow.getBounds()
       saveSettings(s)
+      // Re-enforce stealth after move
+      enforceStealthProperties()
     }
   })
   mainWindow.on('resized', () => {
@@ -263,6 +310,8 @@ function createWindow() {
       const s = loadSettings()
       s.windowBounds = mainWindow.getBounds()
       saveSettings(s)
+      // Re-enforce stealth after resize
+      enforceStealthProperties()
     }
   })
 
@@ -272,7 +321,49 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../dist/index.html'))
   }
 
+  // ★ STEALTH — Periodic enforcement every 3 seconds ★
+  // This catches any edge cases where Windows might reset display affinity
+  if (stealthEnforcerInterval) clearInterval(stealthEnforcerInterval)
+  stealthEnforcerInterval = setInterval(() => {
+    enforceStealthProperties()
+  }, 3000)
+
   initAI(settings.apiKey, settings.provider)
+}
+
+// ── Microphone Permission Setup ────────────────────────
+// This is CRITICAL for voice capture in Electron. Without this,
+// getUserMedia() calls in the renderer process will be silently denied.
+function setupMediaPermissions() {
+  const ses = session.defaultSession
+
+  // Grant microphone and screen capture permissions automatically
+  ses.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowedPermissions = ['media', 'microphone', 'audioCapture']
+    if (allowedPermissions.includes(permission)) {
+      callback(true)
+    } else {
+      callback(false)
+    }
+  })
+
+  // Permission check handler — always allow media checks
+  ses.setPermissionCheckHandler((webContents, permission) => {
+    const allowedPermissions = ['media', 'microphone', 'audioCapture']
+    if (allowedPermissions.includes(permission)) {
+      return true
+    }
+    return false
+  })
+
+  // Handle device permission requests (Chromium-level)
+  ses.setDevicePermissionHandler((details) => {
+    // Allow all audio input devices
+    if (details.deviceType === 'hid' || details.deviceType === 'usb') {
+      return false
+    }
+    return true
+  })
 }
 
 // ── Tray ───────────────────────────────────────────────
@@ -298,7 +389,8 @@ function toggleVisibility() {
     mainWindow.hide()
   } else {
     mainWindow.show()
-    mainWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+    // Re-enforce ALL stealth properties after showing
+    enforceStealthProperties()
   }
   isVisible = !isVisible
   mainWindow.webContents.send('visibility-changed', isVisible)
@@ -345,7 +437,8 @@ ipcMain.handle(
     if (!openai) return { error: 'API key not set' }
     try {
       const buffer = Buffer.from(audioData)
-      if (buffer.length < 1000) return { text: '' }
+      // Lower threshold — even small audio chunks can contain speech
+      if (buffer.length < 500) return { text: '' }
 
       const tempPath = join(tmpdir(), `tmp-${Date.now()}.webm`)
       writeFileSync(tempPath, buffer)
@@ -471,7 +564,8 @@ ipcMain.handle('capture-screen', async () => {
   try {
     const wasVisible = mainWindow?.isVisible()
     mainWindow?.hide()
-    await new Promise((r) => setTimeout(r, 150))
+    // Longer delay for screen sharing tools to fully exclude the window
+    await new Promise((r) => setTimeout(r, 300))
 
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
@@ -480,7 +574,8 @@ ipcMain.handle('capture-screen', async () => {
 
     if (wasVisible) {
       mainWindow?.show()
-      mainWindow?.setAlwaysOnTop(true, 'screen-saver', 1)
+      // Re-enforce stealth after showing back
+      enforceStealthProperties()
     }
 
     if (sources.length > 0) {
@@ -489,6 +584,7 @@ ipcMain.handle('capture-screen', async () => {
     return { error: 'No screen source found' }
   } catch (e: any) {
     mainWindow?.show()
+    enforceStealthProperties()
     return { error: e.message }
   }
 })
@@ -519,6 +615,10 @@ ipcMain.on('install-update', () => {
 
 // ── App Lifecycle ──────────────────────────────────────
 app.whenReady().then(() => {
+  // ★ CRITICAL: Setup media permissions BEFORE creating window ★
+  // This allows getUserMedia() to work for microphone access
+  setupMediaPermissions()
+
   createWindow()
   createTray()
   registerShortcuts()
@@ -566,6 +666,10 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
+  if (stealthEnforcerInterval) {
+    clearInterval(stealthEnforcerInterval)
+    stealthEnforcerInterval = null
+  }
 })
 
 app.on('window-all-closed', () => {

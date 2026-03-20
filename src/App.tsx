@@ -77,74 +77,137 @@ export default function App() {
 
   // ── Audio chunk recording ───────────────────────────
   const recordChunk = useCallback((stream: MediaStream) => {
-    if (!stream.active) return
+    if (!stream.active) {
+      console.log('⚠️ Stream is no longer active, stopping recording cycle')
+      return
+    }
+
+    // Check if any audio track is live
+    const audioTracks = stream.getAudioTracks()
+    if (audioTracks.length === 0 || audioTracks[0].readyState !== 'live') {
+      console.log('⚠️ No live audio track available')
+      return
+    }
 
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
-      : 'audio/webm'
+      : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : ''
 
-    const recorder = new MediaRecorder(stream, { mimeType })
+    if (!mimeType) {
+      console.error('❌ No supported audio MIME type found')
+      useStore.getState().setAIError('Audio recording not supported in this environment')
+      return
+    }
+
+    let recorder: MediaRecorder
+    try {
+      recorder = new MediaRecorder(stream, { mimeType })
+    } catch (e: any) {
+      console.error('❌ Failed to create MediaRecorder:', e.message)
+      useStore.getState().setAIError('Failed to start audio recording: ' + e.message)
+      return
+    }
+
     const chunks: Blob[] = []
 
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data)
+      if (e.data && e.data.size > 0) chunks.push(e.data)
+    }
+
+    recorder.onerror = (e: any) => {
+      console.error('❌ MediaRecorder error:', e.error?.message || e)
+      // Try to continue recording cycle despite the error
+      if (useStore.getState().isRecording && stream.active) {
+        setTimeout(() => recordChunk(stream), 500)
+      }
     }
 
     recorder.onstop = async () => {
+      // Schedule next chunk FIRST to avoid gaps in recording
       if (useStore.getState().isRecording && stream.active) {
         recordChunk(stream)
       }
+
+      // Then process the collected audio data
       if (chunks.length > 0) {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        const arrayBuffer = await blob.arrayBuffer()
-        const lang = useStore.getState().settings.language
-        const result = await window.ghostkey.transcribe(arrayBuffer, lang)
-        if (result.text) {
-          useStore.getState().addTranscript(result.text)
+        try {
+          const blob = new Blob(chunks, { type: mimeType })
+          if (blob.size < 500) {
+            // Too small, likely silence — skip transcription
+            return
+          }
+          const arrayBuffer = await blob.arrayBuffer()
+          const lang = useStore.getState().settings.language
+          const result = await window.ghostkey.transcribe(arrayBuffer, lang)
+          if (result.text) {
+            useStore.getState().addTranscript(result.text)
+          } else if (result.error) {
+            console.warn('Transcription warning:', result.error)
+          }
+        } catch (e: any) {
+          console.error('Error processing audio chunk:', e.message)
         }
       }
     }
 
-    recorder.start()
+    // Use timeslice to get periodic data events (every 1 second)
+    // This ensures we get data even if stop() has issues
+    try {
+      recorder.start(1000)
+    } catch (e: any) {
+      console.error('❌ Failed to start MediaRecorder:', e.message)
+      return
+    }
     mediaRecorderRef.current = recorder
 
     const duration = useStore.getState().isInterviewActive ? 5000 : 4000
     chunkTimerRef.current = setTimeout(() => {
-      if (recorder.state === 'recording') recorder.stop()
+      try {
+        if (recorder.state === 'recording') recorder.stop()
+      } catch (e) {
+        // Recorder may have been stopped already
+        if (useStore.getState().isRecording && stream.active) {
+          recordChunk(stream)
+        }
+      }
     }, duration)
   }, [])
 
   // ── Manual recording ────────────────────────────────
-      // Try different audio settings until one works
+  // Try different audio settings until one works
   const getWorkingMicStream = useCallback(async (): Promise<MediaStream> => {
-    // Attempt 1: Best quality (with echo cancellation + noise suppression)
+    // Attempt 1: Best quality (with echo cancellation + noise suppression + auto gain)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
           sampleRate: 16000,
         },
       })
-      console.log('✅ Microphone: Using full audio processing')
+      console.log('✅ Microphone: Using full audio processing (echo cancel + noise suppress + auto gain)')
       return stream
-    } catch (e) {
-      console.log('⚠️ Full audio processing failed, trying simpler settings...')
+    } catch (e: any) {
+      console.log('⚠️ Full audio processing failed:', e.message, '— trying simpler settings...')
     }
 
-    // Attempt 2: Without echo cancellation
+    // Attempt 2: Without echo cancellation but with auto gain
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: true,
+          autoGainControl: true,
           sampleRate: 16000,
         },
       })
-      console.log('✅ Microphone: Using noise suppression only')
+      console.log('✅ Microphone: Using noise suppression + auto gain')
       return stream
-    } catch (e) {
-      console.log('⚠️ Noise suppression only failed, trying basic...')
+    } catch (e: any) {
+      console.log('⚠️ Noise suppression + auto gain failed:', e.message)
     }
 
     // Attempt 3: Most basic (works on almost every PC)
@@ -154,26 +217,69 @@ export default function App() {
       })
       console.log('✅ Microphone: Using basic audio (no processing)')
       return stream
-    } catch (e) {
-      console.log('❌ All microphone attempts failed')
-      throw new Error('Microphone access denied or not available')
+    } catch (e: any) {
+      console.log('⚠️ Basic audio failed:', e.message)
     }
+
+    // Attempt 4: Enumerate devices and pick first audio input explicitly
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const audioInputs = devices.filter((d) => d.kind === 'audioinput')
+      console.log('🔍 Available audio inputs:', audioInputs.map((d) => `${d.label || 'Unknown'} (${d.deviceId})`))
+
+      if (audioInputs.length > 0) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: audioInputs[0].deviceId } },
+        })
+        console.log('✅ Microphone: Using specific device:', audioInputs[0].label || audioInputs[0].deviceId)
+        return stream
+      }
+    } catch (e: any) {
+      console.log('⚠️ Specific device attempt failed:', e.message)
+    }
+
+    console.log('❌ All microphone attempts failed')
+    throw new Error('Microphone access denied or not available. Please check your system audio settings and ensure a microphone is connected.')
   }, [])
+
   const startRecording = useCallback(async () => {
     try {
       const stream = await getWorkingMicStream()
       streamRef.current = stream
+
+      // Verify we actually got audio tracks
+      const tracks = stream.getAudioTracks()
+      if (tracks.length === 0) {
+        throw new Error('No audio tracks in stream')
+      }
+      console.log('🎙️ Recording with track:', tracks[0].label, '| Settings:', JSON.stringify(tracks[0].getSettings()))
+
       useStore.getState().setRecording(true)
       recordChunk(stream)
     } catch (e: any) {
-      useStore.getState().setAIError('Microphone access denied')
+      console.error('❌ startRecording failed:', e.message)
+      useStore.getState().setAIError('Microphone: ' + (e.message || 'Access denied'))
     }
   }, [recordChunk, getWorkingMicStream])
+
   const stopRecording = useCallback(() => {
     useStore.getState().setRecording(false)
-    if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current)
-    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop()
-    streamRef.current?.getTracks().forEach((t) => t.stop())
+    if (chunkTimerRef.current) {
+      clearTimeout(chunkTimerRef.current)
+      chunkTimerRef.current = null
+    }
+    try {
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop()
+      }
+    } catch (e) {
+      // Recorder may already be in an invalid state
+    }
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    } catch (e) {
+      // Stream tracks may already be stopped
+    }
     streamRef.current = null
     mediaRecorderRef.current = null
   }, [])

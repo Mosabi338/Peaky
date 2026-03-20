@@ -218,7 +218,7 @@ export default function Header({
           onChange={(e) => {
             const newMode = e.target.value as AppMode
             setMode(newMode)
-            window.Peaky.saveSettings({ mode: newMode })
+            window.ghostkey.saveSettings({ mode: newMode })
           }}
         >
           {MODES.map((m) => (

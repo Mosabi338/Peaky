@@ -225,7 +225,7 @@ export default function SettingsPanel() {
       </div>
 
       <div className="pt-4 border-t border-white/5 text-center">
-        <p className="text-[10px] text-white/15">GhostKey v2.0.0</p>
+        <p className="text-[10px] text-white/15">GhostKey v2.1.0</p>
       </div>
     </div>
   )
