@@ -46,7 +46,6 @@ export default function SettingsPanel() {
   const [apiKey, setApiKey] = useState('')
   const [provider, setProvider] = useState<'groq' | 'openai'>('groq')
   const [language, setLanguage] = useState('en')
-  const [autoCopy, setAutoCopy] = useState(true)
   const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -55,7 +54,6 @@ export default function SettingsPanel() {
       setApiKey(s.apiKey || s.openaiApiKey || '')
       setProvider(s.provider || 'groq')
       setLanguage(s.language || 'en')
-      setAutoCopy(s.autoCopy !== undefined ? s.autoCopy : true)
     })
   }, [])
 
@@ -66,7 +64,6 @@ export default function SettingsPanel() {
       opacity,
       fontSize: settings.fontSize,
       language,
-      autoCopy,
     }
     await window.ghostkey.saveSettings(newSettings)
     updateSettings(newSettings as any)
@@ -146,25 +143,6 @@ export default function SettingsPanel() {
         </select>
         <p className="text-[10px] text-white/20 mt-1">
           AI will respond in this language. Audio transcription will also use this language.
-        </p>
-      </div>
-
-      {/* Auto-Copy */}
-      <div>
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={autoCopy}
-            onChange={(e) => setAutoCopy(e.target.checked)}
-            className="accent-ghost-500 w-3.5 h-3.5 cursor-pointer"
-          />
-          <div className="flex items-center gap-1.5">
-            <Clipboard size={12} className="text-white/50" />
-            <span className="text-xs text-white/70">Auto-copy answers to clipboard</span>
-          </div>
-        </label>
-        <p className="text-[10px] text-white/20 mt-1 ml-6">
-          When enabled, AI responses are automatically copied so you can paste them instantly.
         </p>
       </div>
 

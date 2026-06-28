@@ -53,6 +53,37 @@
       "signingHashAlgorithms": null,
       "sign": null
     },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "sign": null
+    },
+    "dmg": {
+      "title": "${productName}",
+      "iconSize": 80,
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,

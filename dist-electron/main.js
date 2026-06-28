@@ -1,6 +1,1 @@
-"use strict";
-require("electron");
-require("path");
-require("fs");
-require("os");
-require("./main-Ce-ZIyY1.js");
+"use strict";require("electron");require("path");require("fs");require("os");require("./main-IxpDYTIV.js");

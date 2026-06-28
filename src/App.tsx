@@ -35,7 +35,6 @@ export default function App() {
         opacity: s.opacity || 92,
         fontSize: s.fontSize || 14,
         language: s.language || 'en',
-        autoCopy: s.autoCopy !== undefined ? s.autoCopy : true,
       })
       state.setMode(s.mode || 'interview')
       state.setOpacity(s.opacity || 92)
@@ -57,16 +56,6 @@ export default function App() {
       state.setAILoading(false)
       state.saveToHistory()
 
-      // Auto-copy to clipboard
-      if (state.settings.autoCopy && state.aiResponse) {
-        window.ghostkey
-          .copyToClipboard(state.aiResponse)
-          .then(() => {
-            state.setAutoCopied(true)
-            setTimeout(() => useStore.getState().setAutoCopied(false), 3000)
-          })
-          .catch(() => {})
-      }
     })
 
     return () => {
