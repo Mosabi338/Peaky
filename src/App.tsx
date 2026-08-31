@@ -41,7 +41,7 @@ export default function App() {
     })
   }, [])
 
-  // ── AI streaming + auto-copy ────────────────────────
+  // ── AI streaming ────────────────────────────────────────
   useEffect(() => {
     const offChunk = window.ghostkey.onAIChunk((data) => {
       if (data.error) {

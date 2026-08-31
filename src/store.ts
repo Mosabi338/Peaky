@@ -41,10 +41,6 @@ interface AppState {
   setAIError: (e: string | null) => void
   clearAI: () => void
 
-  // Auto copy
-  autoCopied: boolean
-  setAutoCopied: (v: boolean) => void
-
   // History
   responseHistory: { prompt: string; response: string; timestamp: number }[]
   saveToHistory: () => void
@@ -111,9 +107,6 @@ export const useStore = create<AppState>((set, get) => ({
   setAIError: (e) => set({ aiError: e }),
   clearAI: () => set({ aiResponse: '', aiError: null }),
 
-  autoCopied: false,
-  setAutoCopied: (v) => set({ autoCopied: v }),
-
   responseHistory: [],
   saveToHistory: () => {
     const { aiResponse, transcript } = get()
@@ -142,7 +135,6 @@ export const useStore = create<AppState>((set, get) => ({
     opacity: 92,
     fontSize: 14,
     language: 'en',
-    autoCopy: true,
   },
   updateSettings: (s) => set((prev) => ({ settings: { ...prev.settings, ...s } })),
 
@@ -159,6 +151,5 @@ export const useStore = create<AppState>((set, get) => ({
       lastScreenshot: null,
       newQuestionDetected: false,
       screenChanged: false,
-      autoCopied: false,
     }),
 }))

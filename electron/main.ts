@@ -50,7 +50,6 @@ interface Settings {
   fontSize: number
   stealthLevel: 'normal' | 'max'
   language: string
-  autoCopy: boolean
   windowBounds?: { x: number; y: number; width: number; height: number }
 }
 
@@ -62,7 +61,6 @@ const DEFAULT_SETTINGS: Settings = {
   fontSize: 14,
   stealthLevel: 'max',
   language: 'en',
-  autoCopy: true,
 }
 
 const PROVIDERS: Record<

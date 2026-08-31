@@ -20,7 +20,6 @@ export interface Settings {
   opacity: number
   fontSize: number
   language: string
-  autoCopy: boolean
 }
 
 declare global {

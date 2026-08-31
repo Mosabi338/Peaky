@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { Copy, Check, Trash2, History, Clipboard } from 'lucide-react'
+import { Copy, Check, Trash2, History } from 'lucide-react'
 
 export default function ResponsePanel() {
   const aiResponse = useStore((s) => s.aiResponse)
@@ -9,9 +9,6 @@ export default function ResponsePanel() {
   const clearAI = useStore((s) => s.clearAI)
   const responseHistory = useStore((s) => s.responseHistory)
   const fontSize = useStore((s) => s.settings.fontSize)
-  const autoCopy = useStore((s) => s.settings.autoCopy)
-  const autoCopied = useStore((s) => s.autoCopied)
-
   const bottomRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -66,16 +63,6 @@ export default function ResponsePanel() {
           <span className="text-xs text-white/40">
             {aiLoading ? '✨ Generating...' : aiResponse ? 'Response ready' : 'AI Response'}
           </span>
-          {/* Auto-copied notification */}
-          {autoCopied && (
-            <span className="flex items-center gap-1 text-[10px] text-green-400 animate-pulse">
-              <Clipboard size={10} />
-              Auto-copied!
-            </span>
-          )}
-          {autoCopy && !autoCopied && aiResponse && !aiLoading && (
-            <span className="text-[10px] text-white/20">📋 Auto-copy ON</span>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowHistory(true)} className="text-white/30 hover:text-white/60 transition-colors" title="History">

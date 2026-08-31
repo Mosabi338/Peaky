@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store'
-import { Shield, Wifi, Radio, MousePointer, Eye, Globe, Clipboard } from 'lucide-react'
+import { Shield, Wifi, Radio, MousePointer, Eye, Globe } from 'lucide-react'
 
 export default function StatusBar() {
   const isRecording = useStore((s) => s.isRecording)
   const mode = useStore((s) => s.mode)
   const apiKey = useStore((s) => s.settings.apiKey)
   const language = useStore((s) => s.settings.language)
-  const autoCopy = useStore((s) => s.settings.autoCopy)
   const isInterviewActive = useStore((s) => s.isInterviewActive)
   const isScreenWatchActive = useStore((s) => s.isScreenWatchActive)
   const autoGenerate = useStore((s) => s.autoGenerate)
@@ -44,11 +43,6 @@ export default function StatusBar() {
           <div className="flex items-center gap-1 text-[10px] text-blue-400/60">
             <Globe size={9} />
             <span className="uppercase">{language}</span>
-          </div>
-        )}
-        {autoCopy && (
-          <div className="flex items-center gap-1 text-[10px] text-white/20">
-            <Clipboard size={9} />
           </div>
         )}
       </div>
