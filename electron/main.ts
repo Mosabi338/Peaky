@@ -69,7 +69,7 @@ const PROVIDERS: Record<
 > = {
   groq: {
     baseURL: 'https://api.groq.com/openai/v1',
-    chatModel: 'llama-3.3-70b-versatile',
+    chatModel: 'llama-3.1-8b-instant',
     visionModel: 'llama-3.2-90b-vision-preview',
     whisperModel: 'whisper-large-v3',
   },
